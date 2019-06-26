@@ -1,7 +1,10 @@
 #!/usr/bin/env python2
 from __future__ import print_function
 
+import argparse
+import itertools
 import sys
+
 import numpy as np
 
 def field_striper(one_field):
@@ -85,8 +88,8 @@ class Matrix(object):
         (skipping the first column) and assign to the matrix attribute.
         """
         # First line already skipped with readline executed before
-        self.matrix = np.genfromtxt(matrix_file, delimiter="\t",
-                                    usecols=range(1, len(self.header)+1))
+        used_cols = range(1, len(self.header) + 1)
+        self.matrix = np.genfromtxt(matrix_file, delimiter="\t", usecols=used_cols)
 
 
     def common_fields(self, matrix2):
@@ -95,12 +98,12 @@ class Matrix(object):
 
 
     def join(self, matrix2):
-        """Return a numpy array with the format [ [field1, field2, val1, val2, diff], [...], ...] which
+        """Return a numpy array with the format [ [field1, field2, val1, val2, diff], ...] which
         lists off the difference between data from the two entry matrix, for the common fields.
         """
         common_identifiers = self.common_fields(matrix2)
 
-        total_diff_list = []  # all of the data to write the final diffence file
+        total_diff_list = []  # all of the data to write the final difference file
 
         # The matrix are symetric, we use counters to not go over the same elements
         for counter1, identifier1 in enumerate(common_identifiers):
@@ -130,15 +133,21 @@ class Matrix(object):
 
     def print_pairings(self):
         """Print non redundant correlation pairings."""
-        sorted_md5s = sorted(self.header)
-        for i, md5_1 in enumerate(sorted_md5s):
+        for md5_1, md5_2 in itertools.combinations(sorted(self.header), 2):
             line = self.dico[md5_1]
-            for j, md5_2 in enumerate(sorted_md5s):
-                if j > i:
-                    col = self.dico[md5_2]
-                    value = self.matrix[line, col]
-                    s = "{}\t{}\t{}".format(md5_1, md5_2, value)
-                    print(s)
+            col = self.dico[md5_2]
+            value = self.matrix[line, col]
+            s = "{}\t{}\t{}".format(md5_1, md5_2, value)
+            print(s)
+
+
+def parse_args(args):
+    """Define and return argument parser."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("matrix1", help="A GeEC matrix")
+    parser.add_argument("matrix2", help="A GeEC matrix")
+    parser.add_argument("output", help="Difference file")
+    return parser.parse_args(args)
 
 
 def main():
@@ -147,15 +156,14 @@ def main():
     sort them with the highest difference at the top
     and then we write a file containing all those differences
     """
-    output_name = sys.argv[3]
+    args = parse_args(sys.argv[1:])
 
-    with open(sys.argv[1], 'r') as file1, open(sys.argv[2], 'r') as file2:
+    with open(args.matrix1, 'r') as file1, open(args.matrix2, 'r') as file2:
         matrix1, matrix2 = Matrix(file1), Matrix(file2)
 
     diff_list = matrix1.join(matrix2)
     sorted_diff_list = sort_output(diff_list)
-    write_diff_file(sorted_diff_list, output_name)
-
+    write_diff_file(sorted_diff_list, args.output)
 
 if __name__ == "__main__":
     main()
