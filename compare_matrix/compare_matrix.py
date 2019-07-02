@@ -35,13 +35,14 @@ class Matrix(object):
     everything else is done in the init.
 
     Format of GeEC matrix data file (example):
-    1: \t a \t b \t c \n
+    1: X \t a \t b \t c \n
     2: a \t num \t num \t num \n
     3: b \t num \t num \t num \n
     4: c \t num \t num \t num \n
     where the numbers to the left refer to the line number,
     (a,b,c) to field strings and num is a number from -1 to 1
-    the matrix is symetric, diagonal of ones
+    the matrix is symetric, diagonal of ones.
+    X is either empty or information that is not a column label.
 
     Args:
         matrix_file : already opened GeEC matrix data file
@@ -74,9 +75,8 @@ class Matrix(object):
         the header string and a dictionary mapping each key identifier to
         its column index.
         """
-        fields = header.strip().split('\t')
-        # strip removes all white space on each side of the string (which strips off the first tab)
-        # split creates a list of all strings separated by a tab
+        # we ignore the first column (empty or other info than label)
+        fields = header.rstrip().split('\t')[1:]
         for column_position, field in enumerate(fields):
             good_field = field_striper(field)
             self.header.append(good_field)
@@ -162,6 +162,7 @@ def main():
         matrix1, matrix2 = Matrix(file1), Matrix(file2)
 
     diff_list = matrix1.join(matrix2)
+    # print(len(diff_list))
     sorted_diff_list = sort_output(diff_list)
     write_diff_file(sorted_diff_list, args.output)
 
