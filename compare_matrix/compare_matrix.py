@@ -9,23 +9,16 @@ import numpy as np
 
 def field_striper(one_field):
     """Return the unique identifier (md5sum) from a label."""
-    return one_field.split('_')[-1] # Unique identifier is after the last _
+    return one_field.split('_')[-1] # when unique identifier is after the last _
 
+def field_striper_alt(one_field):
+    """Return the unique identifier (md5sum) from a label."""
+    return one_field.split('_', 1)[0] # when unique identifier is before first _
 
-def sort_output(total_diff_list):
-    """Take an output array made from join and return
-    a view of the sorted one with descending difference.
-    """
-    # sorts with the fifth column
-    # argsort() returns a list of index
-    index_list = total_diff_list[:, 4].argsort()
-    sorted_array = total_diff_list[index_list]
-    return sorted_array[::-1]
-
-
-def write_diff_file(diff_matrix, name_output):
-    """Write the result of matrix join in the desired format."""
-    np.savetxt(name_output, diff_matrix, fmt='%s') # Here spaces will separate elements
+def write_diff_list(diff_list, path):
+    """Write the result of matrix join in descencing order of difference."""
+    diff_list.sort(order="diff") # sort on the differen
+    np.savetxt(path, np.flipud(diff_list), fmt="%s %s %.4f %.4f %g", delimiter='\t')
 
 
 class Matrix(object):
@@ -76,9 +69,9 @@ class Matrix(object):
         its column index.
         """
         # we ignore the first column (empty or other info than label)
-        fields = header.rstrip().split('\t')[1:]
+        fields = header.rstrip('\n').split('\t')[1:]
         for column_position, field in enumerate(fields):
-            good_field = field_striper(field)
+            good_field = field_striper_alt(field)
             self.header.append(good_field)
             self.dico[good_field] = column_position
 
@@ -103,33 +96,28 @@ class Matrix(object):
         """
         common_identifiers = self.common_fields(matrix2)
 
+        data_type = [("id1", 'U64'), ("id2", 'U64'), ("val1", 'f4'), ("val2", 'f4'), ("diff", 'f4')]
         total_diff_list = []  # all of the data to write the final difference file
 
-        # The matrix are symetric, we use counters to not go over the same elements
-        for counter1, identifier1 in enumerate(common_identifiers):
+        # The matrix are symetric, we only go over one half, ignoring diagonal
+        for i, j in itertools.combinations(range(len(common_identifiers)), 2):
+
+            identifier1 = common_identifiers[i]
+            identifier2 = common_identifiers[j]
 
             col1 = self.dico[identifier1]
             col2 = matrix2.dico[identifier1]
-            # The respective column of the identifer in each matrix
 
-            for counter2, identifier2 in enumerate(common_identifiers):
+            line1 = self.dico[identifier2]
+            line2 = matrix2.dico[identifier2]
 
-                if counter2 > counter1:
-                # Don't calculate for the same identifier or the permutation of two identifiers
+            value1 = self.matrix[line1, col1]
+            value2 = matrix2.matrix[line2, col2]
+            diff = abs(value2 - value1)
 
-                    line1 = self.dico[identifier2]
-                    line2 = matrix2.dico[identifier2]
-                    # The respective line of the identifer in each matrix
-                    # line and column coulb be inverted, the matrix are symetric
+            total_diff_list.append((identifier1, identifier2, value1, value2, diff))
 
-                    value1 = self.matrix[line1, col1]
-                    value2 = matrix2.matrix[line2, col2]
-                    diff = abs(value2 - value1)
-
-                    total_diff_list.append([identifier1, identifier2, value1, value2, diff])
-
-        return np.array(total_diff_list)
-
+        return np.array(total_diff_list, dtype=data_type)
 
     def print_pairings(self):
         """Print non redundant correlation pairings."""
@@ -154,7 +142,7 @@ def main():
     """We join our two data files from the expected format
     to find what data is different for the same combination of fields,
     sort them with the highest difference at the top
-    and then we write a file containing all those differences
+    and then we write a file containing all those differences.
     """
     args = parse_args(sys.argv[1:])
 
@@ -162,9 +150,9 @@ def main():
         matrix1, matrix2 = Matrix(file1), Matrix(file2)
 
     diff_list = matrix1.join(matrix2)
-    # print(len(diff_list))
-    sorted_diff_list = sort_output(diff_list)
-    write_diff_file(sorted_diff_list, args.output)
+    print(len(diff_list))
+    write_diff_list(diff_list, args.output)
+
 
 if __name__ == "__main__":
     main()
