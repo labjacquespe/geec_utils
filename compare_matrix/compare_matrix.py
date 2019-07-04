@@ -91,19 +91,16 @@ class Matrix(object):
 
 
     def join(self, matrix2):
-        """Return a numpy array with the format [ [field1, field2, val1, val2, diff], ...] which
+        """Return a structured numpy array with the format [ (field1, field2, val1, val2, diff), ...] which
         lists off the difference between data from the two entry matrix, for the common fields.
         """
-        common_identifiers = self.common_fields(matrix2)
-
         data_type = [("id1", 'U64'), ("id2", 'U64'), ("val1", 'f4'), ("val2", 'f4'), ("diff", 'f4')]
         total_diff_list = []  # all of the data to write the final difference file
 
-        # The matrix are symetric, we only go over one half, ignoring diagonal
-        for i, j in itertools.combinations(range(len(common_identifiers)), 2):
-
-            identifier1 = common_identifiers[i]
-            identifier2 = common_identifiers[j]
+        # We compute difference for each unique unordered pair of common identifiers,
+        # ignoring same identifier pairs.
+        common_identifiers = self.common_fields(matrix2)
+        for identifier1, identifier2 in itertools.combinations(common_identifiers, 2):
 
             col1 = self.dico[identifier1]
             col2 = matrix2.dico[identifier1]
